@@ -3,6 +3,7 @@
 #include <TChain.h>
 #include <TBranch.h>
 #include <vector>
+#include <string>
 #include <is_cont.h>
 
 template <typename... branch_type>
