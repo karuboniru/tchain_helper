@@ -29,13 +29,13 @@ private:
     }
 
     template <class T, T I, T... J>
-    inline void do_setaddress(std::integer_sequence<T, I, J...>, std::array<const char *, sizeof...(branch_type)> names)
+    inline void do_setaddress(std::integer_sequence<T, I, J...>, const std::array<const char *, sizeof...(branch_type)> names)
     {
         do_setaddress(std::integer_sequence<std::size_t, I>{}, names);
         do_setaddress(std::integer_sequence<std::size_t, J...>{}, names);
     }
     template <class T, T I>
-    inline void do_setaddress(std::integer_sequence<T, I>, std::array<const char *, sizeof...(branch_type)> names)
+    inline void do_setaddress(std::integer_sequence<T, I>, const std::array<const char *, sizeof...(branch_type)> names)
     {
         int status;
         b_add[I] = chain->GetBranch(std::get<I>(names));
@@ -60,7 +60,7 @@ private:
     }
 
 public:
-    root_chain(std::vector<std::string> file_list, const char *tree_name, std::array<const char *, sizeof...(branch_type)> names) : tree_name(tree_name)
+    root_chain(const std::vector<std::string> file_list, const char *tree_name, const std::array<const char *, sizeof...(branch_type)> names) : tree_name(tree_name)
     {
         chain = new TChain(tree_name);
         for (const auto &i : file_list)
