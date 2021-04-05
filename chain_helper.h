@@ -76,6 +76,7 @@ public:
         // for (auto i : b_add)
         //     delete i;
         do_delete(std::make_integer_sequence<std::size_t, sizeof...(branch_type)>{});
+        delete chain;
     }
 
     std::tuple<decltype(new branch_type)...> &get(std::size_t id)
