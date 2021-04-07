@@ -37,7 +37,6 @@ private:
     template <class T, T I>
     inline void do_setaddress(std::integer_sequence<T, I>, const std::array<const char *, sizeof...(branch_type)> names)
     {
-        int status;
         b_add[I] = chain->GetBranch(std::get<I>(names));
         assert(b_add[I]);
         if (!is_cont<typename std::tuple_element<I, std::tuple<branch_type...>>::type>::value)
