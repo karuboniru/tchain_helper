@@ -4,7 +4,7 @@
 #include <TBranch.h>
 #include <vector>
 #include <string>
-#include <is_cont.h>
+// #include <is_cont.h>
 
 template <typename... branch_type>
 class root_chain
@@ -24,7 +24,7 @@ private:
     template <class T, T I>
     inline void do_delete(std::integer_sequence<T, I>)
     {
-        if (!is_cont<typename std::tuple_element<I, std::tuple<branch_type...>>::type>::value)
+        if (std::is_trivially_copyable<typename std::tuple_element<I, std::tuple<branch_type...>>::type>::value)
             delete[] std::get<I>(data);
     }
 
@@ -39,14 +39,14 @@ private:
     {
         b_add[I] = chain->GetBranch(std::get<I>(names));
         assert(b_add[I]);
-        if (!is_cont<typename std::tuple_element<I, std::tuple<branch_type...>>::type>::value)
+        if (std::is_trivially_copyable<typename std::tuple_element<I, std::tuple<branch_type...>>::type>::value)
         {
             // normal case, assign space and SetBranchAddress, the ugly expression
             // is for properly dealing with arrays, the assigned space is then freed
             // by me (not ROOT)
             std::get<I>(data) = new typename std::tuple_element<I, std::tuple<branch_type...>>::type;
             chain->SetBranchAddress(std::get<I>(names), std::get<I>(data), &b_add[I]);
-            // folling method is broken, don't know why:
+            // following method is broken, don't know why:
             // b_add[I]->SetAddress(std::get<I>(data));
         }
         else
