@@ -4,7 +4,6 @@
 #include <TBranch.h>
 #include <vector>
 #include <string>
-// #include <is_cont.h>
 
 template <typename... branch_type>
 class root_chain
@@ -21,6 +20,7 @@ private:
         do_delete(std::integer_sequence<std::size_t, I>{});
         do_delete(std::integer_sequence<std::size_t, J...>{});
     }
+
     template <class T, T I>
     inline void do_delete(std::integer_sequence<T, I>)
     {
@@ -34,6 +34,7 @@ private:
         do_setaddress(std::integer_sequence<std::size_t, I>{}, names);
         do_setaddress(std::integer_sequence<std::size_t, J...>{}, names);
     }
+
     template <class T, T I>
     inline void do_setaddress(std::integer_sequence<T, I>, const std::array<const char *, sizeof...(branch_type)> names)
     {
@@ -51,11 +52,24 @@ private:
         }
         else
         {
-            // ok, seems for STL containers, CERN ROOT will only accept T** pointer, and
+            // ok, seems for non-trivially copyable containers, ROOT will only accept T** pointer, and
             // assign space on its own, free on its own
             std::get<I>(data) = nullptr;
             chain->SetBranchAddress(std::get<I>(names), &std::get<I>(data), &b_add[I]);
         }
+    }
+
+    template <typename T, T... IDs>
+    std::tuple<const branch_type &...> get_elements(std::integer_sequence<T, IDs...>, std::size_t id)
+    {
+        auto curr = chain->LoadTree(id);
+        if (curr < 0)
+        {
+            throw;
+        }
+        for (auto &i : b_add)
+            i->GetEntry(curr);
+        return {*reinterpret_cast<const typename std::tuple_element<IDs, std::tuple<branch_type...>>::type *>(std::get<IDs>(data))...};
     }
 
 public:
@@ -78,33 +92,26 @@ public:
         delete chain;
     }
 
-    std::tuple<decltype(new branch_type)...> &get(std::size_t id)
+    auto get_elements(std::size_t id)
     {
-        auto curr = chain->LoadTree(id);
-        if (curr < 0)
-        {
-            throw;
-        }
-        for (auto &i : b_add)
-            i->GetEntry(curr);
-        return data;
+        return this->get_elements(std::make_integer_sequence<std::size_t, sizeof...(branch_type)>{}, id);
     }
-    auto get_up()
+
+    auto get_entries()
     {
         return chain->GetEntries();
     }
+
     // used by range-based-for
     class iter
     {
     private:
         long num;
-        root_chain *se;
+        root_chain &se;
 
     public:
-        iter(int m_num, root_chain *root_chain_self)
+        iter(int m_num, root_chain &root_chain_self) : num(m_num), se(root_chain_self)
         {
-            se = root_chain_self;
-            num = m_num;
         }
         iter &operator++()
         {
@@ -115,17 +122,23 @@ public:
         {
             return num != other.num;
         }
-        auto &operator*()
+        auto operator*()
         {
-            return se->get(num);
+            return se.get_elements(num);
         }
     };
+
+    auto operator[](std::size_t id)
+    {
+        return this->get_elements(id);
+    }
+
     auto begin()
     {
-        return iter(0, this);
+        return iter(0, *this);
     }
     auto end()
     {
-        return iter(get_up(), this);
+        return iter(get_entries(), *this);
     }
 };
