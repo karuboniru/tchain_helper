@@ -25,7 +25,10 @@ private:
     inline void do_delete(std::integer_sequence<T, I>)
     {
         if (std::is_trivially_copyable<typename std::tuple_element<I, std::tuple<branch_type...>>::type>::value)
-            delete[] std::get<I>(data);
+            if (std::is_array<typename std::tuple_element<I, std::tuple<branch_type...>>::type>::value)
+                delete[] std::get<I>(data);
+            else
+                delete std::get<I>(data);
     }
 
     template <class T, T I, T... J>
@@ -52,8 +55,8 @@ private:
         }
         else
         {
-            // ok, seems for non-trivially copyable containers, ROOT will only accept T** pointer, and
-            // assign space on its own, free on its own
+            // ok, seems for non-trivially copyable containers, ROOT will only accept 
+            // T** pointer, and assign space on its own, free on its own
             std::get<I>(data) = nullptr;
             chain->SetBranchAddress(std::get<I>(names), &std::get<I>(data), &b_add[I]);
         }
@@ -92,12 +95,12 @@ public:
         delete chain;
     }
 
-    auto get_elements(std::size_t id)
+    decltype(auto) get_elements(std::size_t id)
     {
         return this->get_elements(std::make_integer_sequence<std::size_t, sizeof...(branch_type)>{}, id);
     }
 
-    auto get_entries()
+    decltype(auto) get_entries()
     {
         return chain->GetEntries();
     }
@@ -106,7 +109,7 @@ public:
     class iter
     {
     private:
-        long num;
+        std::size_t num;
         root_chain &se;
 
     public:
@@ -122,22 +125,22 @@ public:
         {
             return num != other.num;
         }
-        auto operator*()
+        decltype(auto) operator*()
         {
             return se.get_elements(num);
         }
     };
 
-    auto operator[](std::size_t id)
+    decltype(auto) operator[](std::size_t id)
     {
-        return this->get_elements(id);
+        return get_elements(id);
     }
 
-    auto begin()
+    decltype(auto) begin()
     {
         return iter(0, *this);
     }
-    auto end()
+    decltype(auto) end()
     {
         return iter(get_entries(), *this);
     }
