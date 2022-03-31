@@ -1,16 +1,17 @@
 #pragma once
 
-#include <TChain.h>
 #include <TBranch.h>
-#include <vector>
+#include <TChain.h>
+#include <memory>
 #include <string>
+#include <vector>
 
 template <typename... branch_type>
 class root_chain
 {
 private:
-    TChain *chain{};
-    std::tuple<decltype(new branch_type)...> data;
+    std::unique_ptr<TChain> chain{};
+    std::tuple<branch_type*...> data;
     std::array<TBranch *, sizeof...(branch_type)> b_add;
     const char *tree_name;
 
@@ -24,11 +25,11 @@ private:
     template <class T, T I>
     inline void do_delete(std::integer_sequence<T, I>)
     {
-        if (std::is_trivially_copyable<typename std::tuple_element<I, std::tuple<branch_type...>>::type>::value)
-            if (std::is_array<typename std::tuple_element<I, std::tuple<branch_type...>>::type>::value)
-                delete[] std::get<I>(data);
-            else
-                delete std::get<I>(data);
+        typedef typename std::tuple_element<I, std::tuple<branch_type...>>::type
+            thistype;
+        if (std::is_trivially_copyable<thistype>::value)
+            std::default_delete<thistype>{}(std::get<I>(data));
+            // simliar to std::is_array<thistype>::value?delete [] std::get<I>(data):delete std::get<I>(data);
     }
 
     template <class T, T I, T... J>
@@ -43,19 +44,21 @@ private:
     {
         b_add[I] = chain->GetBranch(std::get<I>(names));
         assert(b_add[I]);
-        if (std::is_trivially_copyable<typename std::tuple_element<I, std::tuple<branch_type...>>::type>::value)
+        typedef typename std::tuple_element<I, std::tuple<branch_type...>>::type
+            thistype;
+        if (std::is_trivially_copyable<thistype>::value)
         {
             // normal case, assign space and SetBranchAddress, the ugly expression
             // is for properly dealing with arrays, the assigned space is then freed
             // by me (not ROOT)
-            std::get<I>(data) = new typename std::tuple_element<I, std::tuple<branch_type...>>::type;
+            std::get<I>(data) = reinterpret_cast<thistype*> (new thistype);
             chain->SetBranchAddress(std::get<I>(names), std::get<I>(data), &b_add[I]);
             // following method is broken, don't know why:
             // b_add[I]->SetAddress(std::get<I>(data));
         }
         else
         {
-            // ok, seems for non-trivially copyable containers, ROOT will only accept 
+            // ok, seems for non-trivially copyable containers, ROOT will only accept
             // T** pointer, and assign space on its own, free on its own
             std::get<I>(data) = nullptr;
             chain->SetBranchAddress(std::get<I>(names), &std::get<I>(data), &b_add[I]);
@@ -72,13 +75,13 @@ private:
         }
         for (auto &i : b_add)
             i->GetEntry(curr);
-        return {*reinterpret_cast<const typename std::tuple_element<IDs, std::tuple<branch_type...>>::type *>(std::get<IDs>(data))...};
+        return {*std::get<IDs>(data)...};
     }
 
 public:
     root_chain(const std::vector<std::string> file_list, const char *tree_name, const std::array<const char *, sizeof...(branch_type)> names) : tree_name(tree_name)
     {
-        chain = new TChain(tree_name);
+        chain = std::make_unique<TChain>(tree_name);
         for (const auto &i : file_list)
         {
             chain->Add(i.c_str());
@@ -89,10 +92,9 @@ public:
     ~root_chain()
     {
         chain->ResetBranchAddresses();
-        // for (auto i : b_add)
-        //     delete i;
         do_delete(std::make_integer_sequence<std::size_t, sizeof...(branch_type)>{});
-        delete chain;
+        // cleaning of chain is done by unique_ptr
+        // the chain will then clean up TBranches
     }
 
     decltype(auto) get_elements(std::size_t id)
