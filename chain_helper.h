@@ -155,13 +155,11 @@ public:
                 for (const auto &s : chain) {
                     std::apply([&thread_obj](auto &&...args) { thread_obj.run(std::forward<decltype(args)>(args)...); }, s);
                 }
-                {
-                    if constexpr (finalize_unpar) {
-                        std::lock_guard<std::mutex> lock(finalize_lock);
-                        thread_obj.finalize();
-                    } else {
-                        thread_obj.finalize();
-                    }
+                if constexpr (finalize_unpar) {
+                    std::lock_guard<std::mutex> lock(finalize_lock);
+                    thread_obj.finalize();
+                } else {
+                    thread_obj.finalize();
                 }
             });
         }
